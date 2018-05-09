@@ -19,6 +19,7 @@ Site is down during renewal - a few seconds
             - ContainerPort: 80
               HostPort: 80
 ```
+
 3. `certbot-auto` then begins the handshake with the letsencrypt CA service. letsencryt CA will first verify that it can connect to `<your domain>:80`  ( which should be available given #2 ) 
 
 # Usage
@@ -34,3 +35,12 @@ Renewal follows the same process.
 2. A cluster(EcsClusterExportName) to place the container
 2. Reachable ecs service to container
 
+# Notes
+Saving the certificates to parameter store has a strange effect in that new lines are replaced with a space, here's the python code to fix the cert up when saving it for use by the web front.
+```
+        file.write(result['Parameter']['Value'].replace(' ','\n')\
+            .replace('-----BEGIN\nCERTIFICATE-----','-----BEGIN CERTIFICATE-----')\
+            .replace('-----END\nCERTIFICATE-----','-----END CERTIFICATE-----')\
+            .replace('-----BEGIN\nPRIVATE\nKEY-----','-----BEGIN PRIVATE KEY-----')\
+            .replace('-----END\nPRIVATE\nKEY-----','-----END PRIVATE KEY-----'))
+```
