@@ -1,0 +1,79 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  AppName:
+    Type : String
+  Image:
+    Type: String 
+  EcsClusterExportName:
+    Type: String
+  Domain:
+    Type: String
+  RegistrationEmailAddress:
+    Type: String    
+Resources:
+  CloudwatchLogsGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join ['-', [!Ref AppName, lg ]]
+      RetentionInDays: 1
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: "/"
+      Policies:
+        - PolicyName: AllowSetParam
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - ssm:PutParameter
+                Effect: Allow
+                Resource:
+                  - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ssl*      
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      TaskRoleArn: !GetAtt TaskRole.Arn    
+      ContainerDefinitions:
+        - Name: !Ref AppName
+          Essential: 'true'
+          Image: !Ref Image
+          Cpu: 128
+          MemoryReservation: 512  
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref 'CloudwatchLogsGroup'
+              awslogs-region: !Ref 'AWS::Region'
+              awslogs-stream-prefix: !Sub "job"           
+          PortMappings:
+            - ContainerPort: 80
+              HostPort: 80
+            - ContainerPort: 443
+              HostPort: 443       
+          Environment:
+            - Name: domain
+              Value: !Ref Domain
+            - Name: registrationEmailAddress
+              Value: !Ref RegistrationEmailAddress
+            - Name : AWS_DEFAULT_REGION
+              Value: !Ref AWS::Region
+            - Name : AWS_REGION
+              Value: !Ref AWS::Region   
+      NetworkMode: host
+  Service:
+    Type: 'AWS::ECS::Service'
+    Properties:
+      Cluster: 
+        Fn::ImportValue: !Ref EcsClusterExportName
+      DesiredCount: 0
+      TaskDefinition: !Ref TaskDefinition
+      ServiceName: !Ref AppName
